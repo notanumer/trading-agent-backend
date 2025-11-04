@@ -1,0 +1,8 @@
+.idea/
+.vscode/
+out/
+bin
+*.exe
+.env
+.backend/
+docs/

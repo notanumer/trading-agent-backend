@@ -1,0 +1,149 @@
+version: "2"
+run:
+  concurrency: 12
+  modules-download-mode: vendor
+  issues-exit-code: 1
+  tests: true
+  allow-parallel-runners: true
+linters:
+  default: none
+  enable:
+    # complexity
+    - cyclop
+    - gocognit
+    - funlen
+    # bugs
+    - errcheck
+    - gosec
+    - noctx
+    - staticcheck
+    # performance
+    - govet
+    - prealloc
+    # code style + cleanup
+    - depguard
+    - dupl
+    - goconst
+    - gocritic
+    - ineffassign
+    - misspell
+    - nakedret
+    - revive
+    - unconvert
+    - unparam
+    - unused
+    # formatters
+    - bodyclose
+  settings:
+    cyclop:
+      max-complexity: 25
+      package-average: 0
+    depguard:
+      rules:
+        deprecation:
+          deny:
+            - pkg: github.com/go-mgo/mgo
+    dupl:
+      threshold: 150
+    errcheck:
+      check-type-assertions: true
+      check-blank: false
+    funlen:
+      lines: 130
+      statements: 100
+    gocognit:
+      min-complexity: 25
+    goconst:
+      match-constant: true
+      min-len: 5
+      min-occurrences: 3
+      numbers: true
+      ignore-calls: true
+    gosec:
+      excludes:
+        - G112
+    govet:
+      disable:
+        - fieldalignment
+      enable-all: true
+    misspell:
+      locale: US
+    prealloc:
+      simple: true
+      range-loops: true
+      for-loops: false
+    revive:
+      severity: warning
+      rules:
+        - name: line-length-limit
+          arguments:
+            - 180
+        - name: function-result-limit
+          arguments:
+            - 3
+        - name: argument-limit
+          arguments:
+            - 6
+        - name: blank-imports
+        - name: error-return
+        - name: increment-decrement
+        - name: deep-exit
+        - name: var-declaration
+        - name: package-comments
+        - name: dot-imports
+        - name: exported
+        - name: unreachable-code
+        - name: waitgroup-by-value
+        - name: early-return
+        - name: indent-error-flow
+        - name: range
+        - name: errorf
+        - name: error-naming
+        - name: error-strings
+        - name: receiver-naming
+        - name: unexported-return
+        - name: time-naming
+        - name: context-keys-type
+        - name: context-as-argument
+        - name: defer
+        - name: nested-structs
+        - name: var-naming
+          arguments:
+            - - ID
+              - HTTP
+              - GUID
+              - UUID
+              - SQL
+              - SSH
+              - JSON
+              - API
+            - - URL
+              - DB
+    unused:
+      field-writes-are-uses: true
+      post-statements-are-reads: true
+      parameters-are-used: true
+      local-variables-are-used: true
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - goconst
+          - dupl
+        path: (.+)_test\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

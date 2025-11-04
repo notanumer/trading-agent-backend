@@ -1,0 +1,1 @@
+SELECT id, address, api_key, user_id, created_at FROM wallets WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1

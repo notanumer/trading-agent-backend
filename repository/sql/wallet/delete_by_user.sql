@@ -1,0 +1,1 @@
+DELETE FROM wallets WHERE user_id=$1

@@ -1,0 +1,1 @@
+SELECT id, balance, pnl, roe, created_at FROM stats ORDER BY created_at DESC LIMIT 1

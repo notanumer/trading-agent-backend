@@ -1,0 +1,1 @@
+INSERT INTO wallets (address, api_key, user_id) VALUES ($1, $2, $3) RETURNING id, created_at

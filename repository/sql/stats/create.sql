@@ -1,0 +1,1 @@
+INSERT INTO stats (balance, pnl, roe) VALUES ($1, $2, $3) RETURNING id, created_at
