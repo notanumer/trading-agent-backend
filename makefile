@@ -7,3 +7,11 @@ new-migration:
 
 swag:
 	swag init --parseDependency --dir ./api --generalInfo server.go --output ./api/docs
+
+lint:
+	golangci-lint run ./...
+fmt:
+	golangci-lint fmt ./...
+
+install-hooks:
+	git config core.hooksPath .githooks

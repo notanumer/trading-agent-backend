@@ -72,36 +72,69 @@ func (c *liveClient) GetLiveStats(ctx context.Context) (*LiveStats, error) {
 	return nil, errors.New("failed to fetch live stats")
 }
 
-// tryFetchPortfolio parses response like array of [label, { accountValueHistory, pnlHistory }]
 func (c *liveClient) tryFetchPortfolio(ctx context.Context) (*LiveStats, bool) {
+	raw, ok := c.fetchPortfolioRaw(ctx)
+	if !ok {
+		return nil, false
+	}
+
+	labelTo, ok := c.parsePortfolioResponse(raw)
+	if !ok || len(labelTo) == 0 {
+		return nil, false
+	}
+
+	pick := c.selectPreferredData(labelTo)
+	if pick == nil {
+		return nil, false
+	}
+
+	bal, ok1 := c.getLastValue(pick, "accountValueHistory")
+	pnl, ok2 := c.getLastValue(pick, "pnlHistory")
+	if !ok1 {
+		return nil, false
+	}
+
+	roe := 0.0
+	if bal != 0 && ok2 {
+		roe = (pnl / bal) * 100
+	}
+
+	return &LiveStats{Balance: bal, PnL: pnl, ROE: roe}, true
+}
+
+// fetchPortfolioRaw выполняет HTTP-запрос и возвращает тело ответа.
+func (c *liveClient) fetchPortfolioRaw(ctx context.Context) ([]byte, bool) {
 	url := strings.TrimRight(c.cfg.HLBaseURL, "/") + "/info"
 	payload := map[string]any{"type": "portfolio", "user": c.walletAddress}
 	b, _ := json.Marshal(payload)
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(b))
 	if err != nil {
 		return nil, false
 	}
 	req.Header.Set("Content-Type", "application/json")
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, false
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, false
 	}
-	raw, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, false
-	}
-	_ = raw // logging removed
 
+	raw, err := io.ReadAll(resp.Body)
+	return raw, err == nil
+}
+
+// parsePortfolioResponse парсит JSON и строит мапу label → объект.
+func (c *liveClient) parsePortfolioResponse(raw []byte) (map[string]map[string]any, bool) {
 	var arr []any
 	if err := json.Unmarshal(raw, &arr); err != nil {
 		return nil, false
 	}
-	prefs := []string{"perpDay", "day", "perpWeek", "week", "perpMonth", "month", "perpAllTime", "allTime"}
-	// Build label->object
+
 	labelTo := make(map[string]map[string]any)
 	for _, item := range arr {
 		tup, ok := item.([]any)
@@ -114,60 +147,48 @@ func (c *liveClient) tryFetchPortfolio(ctx context.Context) (*LiveStats, bool) {
 			labelTo[lbl] = obj
 		}
 	}
-	var pick map[string]any
+	return labelTo, true
+}
+
+// selectPreferredData выбирает первый подходящий набор по приоритету.
+func (c *liveClient) selectPreferredData(labelTo map[string]map[string]any) map[string]any {
+	prefs := []string{"perpDay", "day", "perpWeek", "week", "perpMonth", "month", "perpAllTime", "allTime"}
 	for _, p := range prefs {
 		if o, ok := labelTo[p]; ok {
-			pick = o
-			break
+			return o
 		}
 	}
-	if pick == nil {
-		for _, o := range labelTo {
-			pick = o
-			break
-		}
+	// fallback: любой первый
+	for _, o := range labelTo {
+		return o
 	}
-	if pick == nil {
-		return nil, false
-	}
+	return nil
+}
 
-	lastVal := func(key string) (float64, bool) {
-		seq, ok := pick[key]
-		if !ok {
-			return 0, false
-		}
-		list, ok := seq.([]any)
-		if !ok || len(list) == 0 {
-			return 0, false
-		}
-		last := list[len(list)-1]
-		pair, ok := last.([]any)
-		if !ok || len(pair) != 2 {
-			return 0, false
-		}
-		switch v := pair[1].(type) {
-		case string:
-			f, err := strconv.ParseFloat(v, 64)
-			if err != nil {
-				return 0, false
-			}
-			return f, true
-		case float64:
-			return v, true
-		}
+// getLastValue извлекает последнее значение из истории по ключу.
+func (c *liveClient) getLastValue(data map[string]any, key string) (float64, bool) {
+	seq, ok := data[key]
+	if !ok {
 		return 0, false
 	}
-
-	bal, ok1 := lastVal("accountValueHistory")
-	pnl, ok2 := lastVal("pnlHistory")
-	if !ok1 {
-		return nil, false
+	list, ok := seq.([]any)
+	if !ok || len(list) == 0 {
+		return 0, false
 	}
-	roe := 0.0
-	if bal != 0 && ok2 {
-		roe = (pnl / bal) * 100
+	last := list[len(list)-1]
+	pair, ok := last.([]any)
+	if !ok || len(pair) != 2 {
+		return 0, false
 	}
-	return &LiveStats{Balance: bal, PnL: pnl, ROE: roe}, true
+	switch v := pair[1].(type) {
+	case string:
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f, true
+		}
+	case float64:
+		return v, true
+	}
+	return 0, false
 }
 
 // HistoricalOrders fetches user's historical orders raw list from HL info API.
@@ -231,26 +252,23 @@ func (c *liveClient) UserFees(ctx context.Context) (*UserFees, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.New("failed to fetch user fees")
 	}
-	var out struct {
-		UserCrossRate          string `json:"userCrossRate"`
-		UserAddRate            string `json:"userAddRate"`
-		ActiveReferralDiscount string `json:"activeReferralDiscount"`
-		ActiveStakingDiscount  *struct {
-			Discount string `json:"discount"`
-		} `json:"activeStakingDiscount"`
-	}
+
+	var out UserFeeResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return nil, err
 	}
+
 	toF := func(s string) float64 { v, _ := strconv.ParseFloat(s, 64); return v }
 	fees := &UserFees{
 		UserCrossRate:    toF(out.UserCrossRate),
 		UserAddRate:      toF(out.UserAddRate),
 		ReferralDiscount: toF(out.ActiveReferralDiscount),
 	}
+
 	if out.ActiveStakingDiscount != nil {
 		fees.StakingActiveDiscount = toF(out.ActiveStakingDiscount.Discount)
 	}
+
 	return fees, nil
 }
 

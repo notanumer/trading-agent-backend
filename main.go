@@ -22,14 +22,22 @@ import (
 
 func main() {
 	log := logger.New()
-	defer log.Sync()
+	defer func() {
+		err := log.Sync()
+		if err != nil {
+			log.Sugar().Fatalw("failed to sync log", "error", err)
+		}
+	}()
 
 	cfg, err := config.Load()
 	if err != nil {
 		log.Sugar().Fatalw("failed to load config", "error", err)
 	}
 
-	dbConn, err := db.NewPostgres(cfg.DBURL)
+	mainCtx, cancelCtx := context.WithCancel(context.Background())
+	defer cancelCtx()
+
+	dbConn, err := db.NewPostgres(mainCtx, cfg.DBURL)
 	if err != nil {
 		log.Sugar().Fatalw("failed to connect postgres", "error", err)
 	}

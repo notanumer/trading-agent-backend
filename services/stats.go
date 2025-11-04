@@ -22,7 +22,7 @@ func (s *StatsService) Latest(ctx context.Context) (models.Stats, error) {
 	if err != nil {
 		if err == sql.ErrNoRows {
 			zero := models.Stats{Balance: 0, PnL: 0, ROE: 0}
-			if err := s.statsRepo.Create(ctx, &zero); err != nil {
+			if err = s.statsRepo.Create(ctx, &zero); err != nil {
 				return models.Stats{}, err
 			}
 			return zero, nil

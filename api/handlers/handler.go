@@ -15,7 +15,12 @@ type Handler struct {
 	hl      hyperliquid.Client
 }
 
-func New(wallet *services.WalletService, botSvc *bot.Service, stats *services.StatsService, trades *services.TradesService, authSvc *services.AuthService, hl hyperliquid.Client) *Handler {
+func New(
+	wallet *services.WalletService,
+	botSvc *bot.Service, stats *services.StatsService,
+	trades *services.TradesService, authSvc *services.AuthService,
+	hl hyperliquid.Client,
+) *Handler {
 	return &Handler{
 		wallet:  wallet,
 		botSvc:  botSvc,

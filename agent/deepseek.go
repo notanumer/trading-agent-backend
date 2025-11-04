@@ -11,21 +11,6 @@ import (
 	"deepseek-trader/config"
 )
 
-type Decision struct {
-	Action     string  `json:"action"` // buy|sell|none
-	Symbol     string  `json:"symbol"` // e.g., BTCUSDT
-	Size       float64 `json:"size"`   // in base units
-	Order      string  `json:"order"`  // market|limit
-	LimitPrice float64 `json:"limitPrice,omitempty"`
-}
-
-type Snapshot struct {
-	Balance float64 `json:"balance"`
-	PnL     float64 `json:"pnl"`
-	ROE     float64 `json:"roe"`
-	Trades  []any   `json:"trades"` // minimal for now
-}
-
 type DecisionAgent interface {
 	Decide(ctx context.Context, snap Snapshot) (Decision, error)
 }
@@ -58,7 +43,7 @@ func (a *DeepseekAgent) Decide(ctx context.Context, snap Snapshot) (Decision, er
 	if url[len(url)-1] == '/' {
 		url = url[:len(url)-1]
 	}
-	url = url + "/v1/chat/completions"
+	url += "/v1/chat/completions"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(b))
 	if err != nil {
 		return Decision{Action: "none"}, err
@@ -73,13 +58,8 @@ func (a *DeepseekAgent) Decide(ctx context.Context, snap Snapshot) (Decision, er
 	if resp.StatusCode != http.StatusOK {
 		return Decision{Action: "none"}, errors.New("deepseek http error")
 	}
-	var out struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
-	}
+
+	var out DeepseekResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return Decision{Action: "none"}, err
 	}

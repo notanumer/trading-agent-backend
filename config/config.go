@@ -60,16 +60,6 @@ func getInt(key string, def int) int {
 	return def
 }
 
-func getBool(key string, def bool) bool {
-	if v := os.Getenv(key); v != "" {
-		b, err := strconv.ParseBool(v)
-		if err == nil {
-			return b
-		}
-	}
-	return def
-}
-
 func getFloat(key string, def float64) float64 {
 	if v := os.Getenv(key); v != "" {
 		if f, err := strconv.ParseFloat(v, 64); err == nil {

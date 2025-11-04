@@ -9,6 +9,9 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
+	github.com/swaggo/files v1.0.1
+	github.com/swaggo/gin-swagger v1.6.1
+	github.com/swaggo/swag v1.16.6
 	go.uber.org/zap v1.26.0
 )
 
@@ -52,9 +55,6 @@ require (
 	github.com/sonirico/vago v0.9.0 // indirect
 	github.com/sonirico/vago/lol v0.0.0-20250901170347-2d1d82c510bd // indirect
 	github.com/supranational/blst v0.3.16 // indirect
-	github.com/swaggo/files v1.0.1 // indirect
-	github.com/swaggo/gin-swagger v1.6.1 // indirect
-	github.com/swaggo/swag v1.16.6 // indirect
 	github.com/valyala/fastjson v1.6.4 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect

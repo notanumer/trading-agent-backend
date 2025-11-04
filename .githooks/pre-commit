@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+
+# Format Go code using golangci-lint fmt (fallback to go fmt if not available)
+if command -v golangci-lint >/dev/null 2>&1; then
+  golangci-lint fmt ./...
+else
+  echo "golangci-lint not found; falling back to 'go fmt ./...'"
+  go fmt ./...
+fi
+
+# Ensure formatting changes are included in the commit
+# -u updates the index for tracked files that were modified by formatting
+git add -u
+
+exit 0
+

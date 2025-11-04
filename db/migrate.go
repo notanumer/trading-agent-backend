@@ -5,7 +5,7 @@ import (
 	"embed"
 	"fmt"
 
-	_ "github.com/lib/pq"
+	_ "github.com/lib/pq" //nolint:gci
 	"github.com/pressly/goose/v3"
 	"go.uber.org/zap"
 )
