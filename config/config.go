@@ -20,6 +20,7 @@ type Settings struct {
 	DeepseekBaseURL string
 	DeepseekModel   string
 	FeeRate         float64
+	APIWallet       string
 }
 
 func Load() (*Settings, error) {
@@ -40,6 +41,7 @@ func Load() (*Settings, error) {
 		DeepseekBaseURL: getStr("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
 		DeepseekModel:   getStr("DEEPSEEK_MODEL", "deepseek-chat"),
 		FeeRate:         getFloat("FEE_RATE", 0.0005),
+		APIWallet:       getStr("API_WALLET", ""),
 	}
 	return cfg, nil
 }

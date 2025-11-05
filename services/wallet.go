@@ -13,11 +13,11 @@ import (
 
 type WalletService struct {
 	repo *repository.WalletRepository
-	hl   hyperliquid.Client
+	hl   *hyperliquid.Client
 	cfg  *config.Settings
 }
 
-func NewWalletService(repo *repository.WalletRepository, hl hyperliquid.Client, cfg *config.Settings) *WalletService {
+func NewWalletService(repo *repository.WalletRepository, hl *hyperliquid.Client, cfg *config.Settings) *WalletService {
 	return &WalletService{repo: repo, hl: hl, cfg: cfg}
 }
 

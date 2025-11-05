@@ -20,6 +20,20 @@ type Trade struct {
 	CreatedAt time.Time `db:"created_at" json:"createdAt"`
 }
 
+type Decision struct {
+	ID         int64     `db:"id" json:"id"`
+	Action     string    `db:"action" json:"action"`
+	Symbol     string    `db:"symbol" json:"symbol"`
+	Size       float64   `db:"size" json:"size"`
+	OrderType  string    `db:"order_type" json:"order"`
+	LimitPrice float64   `db:"limit_price" json:"limitPrice"`
+	TP1        float64   `db:"tp1" json:"tp1"`
+	TP2        float64   `db:"tp2" json:"tp2"`
+	TP3        float64   `db:"tp3" json:"tp3"`
+	SL         float64   `db:"sl" json:"sl"`
+	CreatedAt  time.Time `db:"created_at" json:"createdAt"`
+}
+
 type Stats struct {
 	ID        int64     `db:"id" json:"id"`
 	Balance   float64   `db:"balance" json:"balance"`

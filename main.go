@@ -47,7 +47,7 @@ func main() {
 
 	repos := repository.NewRepositories(dbConn)
 
-	hlClient := hyperliquid.NewLiveClient(cfg)
+	hlClient := hyperliquid.NewClient(cfg)
 
 	walletSvc := services.NewWalletService(repos.Wallets, hlClient, cfg)
 	tradesSvc := services.NewTradesService(repos.Trades, hlClient)

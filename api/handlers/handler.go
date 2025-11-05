@@ -12,14 +12,14 @@ type Handler struct {
 	stats   *services.StatsService
 	trades  *services.TradesService
 	authSvc *services.AuthService
-	hl      hyperliquid.Client
+	hl      *hyperliquid.Client
 }
 
 func New(
 	wallet *services.WalletService,
 	botSvc *bot.Service, stats *services.StatsService,
 	trades *services.TradesService, authSvc *services.AuthService,
-	hl hyperliquid.Client,
+	hl *hyperliquid.Client,
 ) *Handler {
 	return &Handler{
 		wallet:  wallet,
