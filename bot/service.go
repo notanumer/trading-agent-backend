@@ -10,6 +10,8 @@ import (
 	"deepseek-trader/hyperliquid"
 	"deepseek-trader/models"
 	"deepseek-trader/services"
+
+	"go.uber.org/zap"
 )
 
 type DeepSeekAgent interface {
@@ -26,11 +28,19 @@ type Service struct {
 	statsSvc  *services.StatsService
 	cfg       *config.Settings
 	agent     DeepSeekAgent
+	log       *zap.Logger
 }
 
-func NewService(hl *hyperliquid.Client, tradesSvc *services.TradesService, statsSvc *services.StatsService, cfg *config.Settings) *Service {
+func NewService(hl *hyperliquid.Client, tradesSvc *services.TradesService, statsSvc *services.StatsService, cfg *config.Settings, log *zap.Logger) *Service {
 	ag := agent.NewDeepseekAgent(cfg)
-	return &Service{hl: hl, tradesSvc: tradesSvc, statsSvc: statsSvc, cfg: cfg, agent: ag}
+	return &Service{
+		hl:        hl,
+		tradesSvc: tradesSvc,
+		statsSvc:  statsSvc,
+		cfg:       cfg,
+		agent:     ag,
+		log:       log,
+	}
 }
 
 func (s *Service) Start() {
@@ -63,7 +73,7 @@ func (s *Service) IsOn() bool {
 }
 
 func (s *Service) loop(ctx context.Context) {
-	ticker := time.NewTicker(60 * time.Second)
+	ticker := time.NewTicker(15 * time.Minute)
 	defer ticker.Stop()
 
 	for {
@@ -71,26 +81,66 @@ func (s *Service) loop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			now := time.Now()
+			endTime := unixMilli(now)
+			startTime := unixMilli(now.Add(-3 * time.Hour))
 			stats, err := s.hl.GetLiveStats(ctx)
 			if err != nil {
+				s.log.Sugar().Errorw("failed to get stats", "error", err)
 				continue
 			}
 
 			coinsMids, err := s.hl.CoinsMids(ctx)
 			if err != nil {
+				s.log.Sugar().Errorw("failed to get coin mids", "error", err)
 				continue
 			}
 
+			meta, err := s.hl.Meta(ctx)
+			if err != nil {
+				s.log.Sugar().Errorw("failed to get meta", "error", err)
+				continue
+			}
+
+			var orderBooks []hyperliquid.OrderBookSnapshot
+			candleSnapshots := make(map[string][]hyperliquid.Candle, 0)
+			for _, coin := range agent.Coins {
+				l2Book, err := s.hl.L2Book(ctx, coin)
+				if err != nil {
+					s.log.Sugar().Errorw("failed to get l2book", "error", err)
+					continue
+				}
+				orderBooks = append(orderBooks, l2Book)
+
+				candleSnapshot, err := s.hl.CandleSnapshot(ctx, coin, startTime, endTime)
+				if err != nil {
+					s.log.Sugar().Errorw("failed to get candle snapshot", "error", err)
+					continue
+				}
+
+				candleSnapshots[coin] = candleSnapshot
+			}
+
 			filtered := agent.FilterCoinsMids(coinsMids)
-			snap := agent.Snapshot{Balance: stats.Balance, PnL: stats.PnL, ROE: stats.ROE, CoinsMids: filtered}
+			snap := agent.Snapshot{
+				Balance:         stats.Balance,
+				PnL:             stats.PnL,
+				ROE:             stats.ROE,
+				CoinsMids:       filtered,
+				Meta:            meta,
+				OrderBooks:      orderBooks,
+				CandleSnapshots: candleSnapshots,
+			}
 
 			hist, err := s.hl.HistoricalOrders(ctx)
 			if err != nil {
+				s.log.Sugar().Errorw("failed to get orders", "error", err)
 				continue
 			}
 
 			decisions, err := s.tradesSvc.LatestDecisions(ctx, 10)
 			if err != nil {
+				s.log.Sugar().Errorw("failed to get lates decisions", "error", err)
 				continue
 			}
 
@@ -104,7 +154,13 @@ func (s *Service) loop(ctx context.Context) {
 			snap.Balance += 10000
 			snap.PnL += 10000
 			snap.ROE += 10000
+			s.log.Sugar().Infow("start agent", "snapshot", snap)
 			dec, err := s.agent.Decide(ctx, snap)
+			if err != nil {
+				s.log.Sugar().Errorw("failed to get decision", "error", err)
+				continue
+			}
+
 			d := models.Decision{
 				Action:     dec.Action,
 				Symbol:     dec.Symbol,
@@ -116,12 +172,21 @@ func (s *Service) loop(ctx context.Context) {
 				TP3:        dec.Targets.TP3,
 				SL:         dec.Targets.SL,
 			}
-			_, _ = s.tradesSvc.RecordDecision(ctx, d)
+
+			_, err = s.tradesSvc.RecordDecision(ctx, d)
 			if err != nil || dec.Action == "none" {
 				continue
 			}
 
-			_, _ = s.tradesSvc.Record(ctx, dec.Symbol, dec.Action, dec.Size, dec.LimitPrice)
+			_, err = s.tradesSvc.Record(ctx, dec.Symbol, dec.Action, dec.Size, dec.LimitPrice)
+			if err != nil {
+				s.log.Sugar().Errorw("failed to record trade", "error", err)
+				continue
+			}
 		}
 	}
+}
+
+func unixMilli(t time.Time) int64 {
+	return t.UnixNano() / 1_000_000
 }

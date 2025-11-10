@@ -1,5 +1,7 @@
 package agent
 
+import "deepseek-trader/hyperliquid"
+
 type Decision struct {
 	Action     string  `json:"action"` // buy|sell|none
 	Symbol     string  `json:"symbol"` // e.g., BTCUSDT
@@ -17,13 +19,16 @@ type Targets struct {
 }
 
 type Snapshot struct {
-	Balance   float64           `json:"balance"`
-	PnL       float64           `json:"pnl"`
-	ROE       float64           `json:"roe"`
-	Trades    []interface{}     `json:"trades"` // minimal for now
-	CoinsMids map[string]string `json:"coinsMids"`
-	Runtime   Runtime           `json:"runtime,omitempty"`
-	Decisions []interface{}     `json:"decisions"`
+	Balance         float64                         `json:"balance"`
+	PnL             float64                         `json:"pnl"`
+	ROE             float64                         `json:"roe"`
+	Trades          []interface{}                   `json:"trades"` // minimal for now
+	CoinsMids       map[string]string               `json:"coinsMids"`
+	Runtime         Runtime                         `json:"runtime,omitempty"`
+	Decisions       []interface{}                   `json:"decisions"`
+	Meta            hyperliquid.ExchangeMeta        `json:"meta"`
+	OrderBooks      []hyperliquid.OrderBookSnapshot `json:"orderBooks"`
+	CandleSnapshots map[string][]hyperliquid.Candle `json:"candleSnapshots"`
 }
 
 type Runtime struct {
@@ -67,7 +72,7 @@ type Message struct {
 	Content string `json:"content"`
 }
 
-var coins = []string{
+var Coins = []string{
 	"BTC",
 	"ETH",
 	"SOL",
@@ -85,12 +90,12 @@ func FilterCoinsMids(all map[string]string) map[string]string {
 		return nil
 	}
 
-	allowed := make(map[string]struct{}, len(coins))
-	for _, c := range coins {
+	allowed := make(map[string]struct{}, len(Coins))
+	for _, c := range Coins {
 		allowed[c] = struct{}{}
 	}
 
-	out := make(map[string]string, len(coins))
+	out := make(map[string]string, len(Coins))
 	for k, v := range all {
 		if _, ok := allowed[k]; ok {
 			out[k] = v

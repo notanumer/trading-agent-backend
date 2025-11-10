@@ -181,6 +181,114 @@ func (c *Client) CoinsMids(ctx context.Context) (map[string]string, error) {
 	return out, nil
 }
 
+func (c *Client) Meta(ctx context.Context) (ExchangeMeta, error) {
+	url := fmt.Sprintf("%s/info", c.cfg.HLBaseURL)
+	payload := Payload{Type: "meta", User: c.walletAddress}
+
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return ExchangeMeta{}, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(b))
+	if err != nil {
+		return ExchangeMeta{}, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return ExchangeMeta{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return ExchangeMeta{}, errors.New("failed to fetch user fees")
+	}
+
+	var out ExchangeMeta
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return ExchangeMeta{}, err
+	}
+
+	return out, nil
+}
+
+func (c *Client) L2Book(ctx context.Context, coin string) (OrderBookSnapshot, error) {
+	url := fmt.Sprintf("%s/info", c.cfg.HLBaseURL)
+	payload := Payload{
+		Type: "l2Book",
+		User: c.walletAddress,
+		Coin: &coin,
+	}
+
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return OrderBookSnapshot{}, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(b))
+	if err != nil {
+		return OrderBookSnapshot{}, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return OrderBookSnapshot{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return OrderBookSnapshot{}, errors.New("failed to fetch user fees")
+	}
+
+	var out OrderBookSnapshot
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return OrderBookSnapshot{}, err
+	}
+
+	return out, nil
+}
+
+func (c *Client) CandleSnapshot(ctx context.Context, coin string, stratTime, endTime int64) ([]Candle, error) {
+	url := fmt.Sprintf("%s/info", c.cfg.HLBaseURL)
+	payload := CandleSnapshotRequest{
+		Type: "candleSnapshot",
+		Req: RequestBody{
+			Coin:      coin,
+			Interval:  "15m",
+			StartTime: stratTime,
+			EndTime:   endTime,
+		},
+	}
+
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to fetch candle snapshot with status %d", resp.StatusCode)
+	}
+
+	var out []Candle
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
 // Вспомогательная нормализация тикера
 func normalizeSymbol(sym string) string {
 	s := strings.ToUpper(strings.TrimSpace(sym))

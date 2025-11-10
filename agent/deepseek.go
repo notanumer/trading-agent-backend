@@ -3,18 +3,15 @@ package agent
 import (
 	"bytes"
 	"context"
-	_ "embed" //nolint:gci
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"deepseek-trader/config"
 )
-
-//go:embed promt.txt
-var systemPrompt string
 
 type DeepseekAgent struct {
 	http *http.Client
@@ -22,13 +19,21 @@ type DeepseekAgent struct {
 }
 
 func NewDeepseekAgent(cfg *config.Settings) *DeepseekAgent {
-	return &DeepseekAgent{http: &http.Client{Timeout: 20 * time.Second}, cfg: cfg}
+	return &DeepseekAgent{http: &http.Client{Timeout: 20 * time.Minute}, cfg: cfg}
 }
 
 func (a *DeepseekAgent) Decide(ctx context.Context, snap Snapshot) (Decision, error) {
 	if a.cfg.DeepseekAPIKey == "" {
 		return Decision{Action: "none"}, nil
 	}
+
+	systemPrompt := fmt.Sprintf(
+		systemPromptTemplate,
+		formatFloat(snap.Balance),
+		formatFloat(snap.PnL),
+		formatFloat(snap.ROE*100),
+		len(snap.Trades),
+	)
 
 	prompt := buildPrompt(snap)
 
@@ -99,12 +104,76 @@ func (a *DeepseekAgent) Decide(ctx context.Context, snap Snapshot) (Decision, er
 }
 
 func buildPrompt(s Snapshot) string {
-	b, err := json.Marshal(s)
-	if err != nil {
-		return ""
+	// Build summary section
+	summaryBuf := bytes.Buffer{}
+
+	// Recent trades
+	if len(s.Trades) > 0 {
+		summaryBuf.WriteString("## Recent Trades\n")
+		summaryBuf.WriteString("Total trades executed: ")
+		summaryBuf.WriteString(formatInt(len(s.Trades)))
+		summaryBuf.WriteString("\n\n")
 	}
-	fmt.Println(string(b))
-	return "Input Snapshot (JSON): " + string(b)
+
+	// Current prices
+	if len(s.CoinsMids) > 0 {
+		summaryBuf.WriteString("## Current Mid Prices\n```\n")
+		for coin, price := range s.CoinsMids {
+			summaryBuf.WriteString(coin)
+			summaryBuf.WriteString(": $")
+			summaryBuf.WriteString(price)
+			summaryBuf.WriteString("\n")
+		}
+		summaryBuf.WriteString("```\n\n")
+	}
+
+	// Order books
+	if len(s.OrderBooks) > 0 {
+		summaryBuf.WriteString("## Order Book Data\n")
+		summaryBuf.WriteString("Available order books: ")
+		summaryBuf.WriteString(formatInt(len(s.OrderBooks)))
+		summaryBuf.WriteString(" symbols\n\n")
+	}
+
+	// Candles
+	if len(s.CandleSnapshots) > 0 {
+		summaryBuf.WriteString("## Candlestick Data (15m intervals)\n")
+		for coin, candles := range s.CandleSnapshots {
+			if len(candles) == 0 {
+				continue
+			}
+			summaryBuf.WriteString("- ")
+			summaryBuf.WriteString(coin)
+			summaryBuf.WriteString(": ")
+			summaryBuf.WriteString(formatInt(len(candles)))
+			summaryBuf.WriteString(" candles\n")
+		}
+		summaryBuf.WriteString("\n")
+	}
+
+	// Recent decisions
+	if len(s.Decisions) > 0 {
+		summaryBuf.WriteString("## Recent Decisions\n")
+		summaryBuf.WriteString("Previous decisions count: ")
+		summaryBuf.WriteString(formatInt(len(s.Decisions)))
+		summaryBuf.WriteString("\n\n")
+	}
+
+	// Marshal full JSON
+	jsonData, err := json.MarshalIndent(s, "", "  ")
+	if err != nil {
+		jsonData, _ = json.Marshal(s)
+	}
+
+	// Format using template
+	return fmt.Sprintf(
+		userPromptTemplate,
+		formatFloat(s.Balance),
+		formatFloat(s.PnL),
+		formatFloat(s.ROE*100),
+		summaryBuf.String(),
+		string(jsonData),
+	)
 }
 
 func (a *DeepseekAgent) buildUrl() string {
@@ -118,4 +187,12 @@ func (a *DeepseekAgent) buildUrl() string {
 	}
 	url += "/v1/chat/completions"
 	return url
+}
+
+func formatFloat(f float64) string {
+	return strconv.FormatFloat(f, 'f', 2, 64)
+}
+
+func formatInt(i int) string {
+	return strconv.Itoa(i)
 }

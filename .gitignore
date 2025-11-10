@@ -4,5 +4,6 @@ out/
 bin
 *.exe
 .env
+.env.docker
 .backend/
 docs/

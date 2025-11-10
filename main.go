@@ -52,7 +52,7 @@ func main() {
 	walletSvc := services.NewWalletService(repos.Wallets, hlClient, cfg)
 	tradesSvc := services.NewTradesService(repos.Trades, hlClient)
 	statsSvc := services.NewStatsService(repos.Stats, repos.Trades)
-	botSvc := bot.NewService(hlClient, tradesSvc, statsSvc, cfg)
+	botSvc := bot.NewService(hlClient, tradesSvc, statsSvc, cfg, log)
 	authSvc := services.NewAuthService(repos.Users, cfg)
 	handlers := handlers.New(walletSvc, botSvc, statsSvc, tradesSvc, authSvc, hlClient)
 
